@@ -40,6 +40,27 @@ private data class MessageCache(
     val accountUuids: Set<String>,
 )
 
+private class MessageSelectionManager {
+    var selected: Set<Long> = emptySet()
+        private set
+
+    fun update(value: Set<Long>) {
+        selected = value
+    }
+
+    fun select(uniqueId: Long) {
+        selected = selected + uniqueId
+    }
+
+    fun deselect(uniqueId: Long) {
+        selected = selected - uniqueId
+    }
+
+    fun clear() {
+        selected = emptySet()
+    }
+}
+
 @Suppress("LongParameterList")
 class MessageListAdapter internal constructor(
     private val theme: Theme,
@@ -101,12 +122,16 @@ class MessageListAdapter internal constructor(
             newPosition?.let { position -> notifyItemChanged(position) }
         }
 
-    var selected: Set<Long> = emptySet()
-        private set(value) {
-            if (value == field) return
+    private val selectionManager = MessageSelectionManager()
 
-            // Selection removed
-            field.asSequence()
+    var selected: Set<Long>
+        get() = selectionManager.selected
+        private set(value) {
+            val oldSelected = selectionManager.selected
+
+            if (value == oldSelected) return
+
+            oldSelected.asSequence()
                 .filter { uniqueId -> uniqueId !in value }
                 .mapNotNull { uniqueId -> messageCache.messagesById[uniqueId] }
                 .mapNotNull { messageListItem -> getPosition(messageListItem) }
@@ -114,16 +139,15 @@ class MessageListAdapter internal constructor(
                     notifyItemChanged(position)
                 }
 
-            // Selection added
             value.asSequence()
-                .filter { uniqueId -> uniqueId !in field }
+                .filter { uniqueId -> uniqueId !in oldSelected }
                 .mapNotNull { uniqueId -> messageCache.messagesById[uniqueId] }
                 .mapNotNull { messageListItem -> getPosition(messageListItem) }
                 .forEach { position ->
                     notifyItemChanged(position)
                 }
 
-            field = value
+            selectionManager.update(value)
             selectedCount = calculateSelectionCount()
         }
 
