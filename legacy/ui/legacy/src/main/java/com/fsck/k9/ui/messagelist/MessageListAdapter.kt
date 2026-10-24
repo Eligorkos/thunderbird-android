@@ -326,10 +326,7 @@ class MessageListAdapter internal constructor(
     }
 
     fun toggleSelection(item: MessageListItem) {
-        if (messagesMap[item.uniqueId] == null) {
-            // MessageListItem is no longer in the list
-            return
-        }
+        if (item.uniqueId !in messagesMap) return
 
         if (item.uniqueId in selected) {
             deselectMessage(item)
