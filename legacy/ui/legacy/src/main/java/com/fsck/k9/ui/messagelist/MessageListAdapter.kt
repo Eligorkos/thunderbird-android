@@ -264,39 +264,49 @@ class MessageListAdapter internal constructor(
     override fun onBindViewHolder(holder: MessageListViewHolder, position: Int) {
         when (val viewType = getItemViewType(position)) {
             TYPE_IN_APP_NOTIFICATION_BANNER_INLINE_LIST if isInAppNotificationEnabled ->
-                (holder as BannerInlineListInAppNotificationViewHolder).bind()
+                bindInAppNotification(holder)
 
-            TYPE_MESSAGE -> {
-                val messageListItem = getItem(position)
-                val formattedMessageListItem = messageListItem.withFormattedDate()
-                val result = featureFlagProvider.provide(GeneratedFeatureFlagKey.USE_COMPOSE_FOR_MESSAGE_LIST_ITEMS)
-                if (result.isEnabled()) {
-                    val messageViewHolder = holder as ComposableMessageViewHolder
-                    messageViewHolder.bind(
-                        item = formattedMessageListItem,
-                        isActive = isActiveMessage(messageListItem),
-                        isSelected = isSelected(messageListItem),
-                    )
-                } else {
-                    val messageViewHolder = holder as MessageViewHolder
-                    messageViewHolder.bind(
-                        messageListItem = formattedMessageListItem,
-                        isActive = isActiveMessage(messageListItem),
-                        isSelected = isSelected(messageListItem),
-                    )
-                }
-            }
+            TYPE_MESSAGE ->
+                bindMessage(holder, position)
 
-            TYPE_FOOTER -> {
-                val footerViewHolder = holder as FooterViewHolder
-                val footer = viewItems[position] as MessageListViewItem.Footer
-                footerViewHolder.bind(footer.text)
-            }
+            TYPE_FOOTER ->
+                bindFooter(holder, position)
 
-            else -> {
+            else ->
                 error("Unsupported type: $viewType")
-            }
         }
+    }
+
+    private fun bindInAppNotification(holder: MessageListViewHolder) {
+        (holder as BannerInlineListInAppNotificationViewHolder).bind()
+    }
+
+    private fun bindMessage(holder: MessageListViewHolder, position: Int) {
+        val messageListItem = getItem(position)
+        val formattedMessageListItem = messageListItem.withFormattedDate()
+        val result = featureFlagProvider.provide(GeneratedFeatureFlagKey.USE_COMPOSE_FOR_MESSAGE_LIST_ITEMS)
+
+        if (result.isEnabled()) {
+            val messageViewHolder = holder as ComposableMessageViewHolder
+            messageViewHolder.bind(
+                item = formattedMessageListItem,
+                isActive = isActiveMessage(messageListItem),
+                isSelected = isSelected(messageListItem),
+            )
+        } else {
+            val messageViewHolder = holder as MessageViewHolder
+            messageViewHolder.bind(
+                messageListItem = formattedMessageListItem,
+                isActive = isActiveMessage(messageListItem),
+                isSelected = isSelected(messageListItem),
+            )
+        }
+    }
+
+    private fun bindFooter(holder: MessageListViewHolder, position: Int) {
+        val footerViewHolder = holder as FooterViewHolder
+        val footer = viewItems[position] as MessageListViewItem.Footer
+        footerViewHolder.bind(footer.text)
     }
 
     private fun isActiveMessage(item: MessageListItem): Boolean {
