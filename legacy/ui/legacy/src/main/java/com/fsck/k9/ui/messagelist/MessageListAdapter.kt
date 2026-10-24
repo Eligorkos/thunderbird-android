@@ -35,6 +35,11 @@ private const val TYPE_MESSAGE = 0
 private const val TYPE_FOOTER = 1
 private const val TYPE_IN_APP_NOTIFICATION_BANNER_INLINE_LIST = 2
 
+private data class MessageCache(
+    val messagesById: Map<Long, MessageListItem>,
+    val accountUuids: Set<String>,
+)
+
 @Suppress("LongParameterList")
 class MessageListAdapter internal constructor(
     private val theme: Theme,
@@ -59,11 +64,14 @@ class MessageListAdapter internal constructor(
 
             field = value
             val messages = value.filterMessageListItem()
-            accountUuids = messages.map { it.account.id.toString() }.toSet()
-            messagesMap = messages.associateBy { it.uniqueId }
+
+            messageCache = MessageCache(
+                messagesById = messages.associateBy { it.uniqueId },
+                accountUuids = messages.map { it.account.id.toString() }.toSet(),
+            )
 
             if (selected.isNotEmpty()) {
-                val uniqueIds = messagesMap.keys
+                val uniqueIds = messageCache.messagesById.keys
                 selected = selected.intersect(uniqueIds)
             }
 
@@ -74,8 +82,11 @@ class MessageListAdapter internal constructor(
         }
 
     private val messages get() = viewItems.filterMessageListItem()
-    private var messagesMap = emptyMap<Long, MessageListItem>()
-    private var accountUuids = emptySet<String>()
+
+    private var messageCache = MessageCache(
+        messagesById = emptyMap(),
+        accountUuids = emptySet(),
+    )
 
     var activeMessage: MessageReference? = null
         set(value) {
@@ -97,7 +108,7 @@ class MessageListAdapter internal constructor(
             // Selection removed
             field.asSequence()
                 .filter { uniqueId -> uniqueId !in value }
-                .mapNotNull { uniqueId -> messagesMap[uniqueId] }
+                .mapNotNull { uniqueId -> messageCache.messagesById[uniqueId] }
                 .mapNotNull { messageListItem -> getPosition(messageListItem) }
                 .forEach { position ->
                     notifyItemChanged(position)
@@ -106,7 +117,7 @@ class MessageListAdapter internal constructor(
             // Selection added
             value.asSequence()
                 .filter { uniqueId -> uniqueId !in field }
-                .mapNotNull { uniqueId -> messagesMap[uniqueId] }
+                .mapNotNull { uniqueId -> messageCache.messagesById[uniqueId] }
                 .mapNotNull { messageListItem -> getPosition(messageListItem) }
                 .forEach { position ->
                     notifyItemChanged(position)
@@ -117,7 +128,7 @@ class MessageListAdapter internal constructor(
         }
 
     val selectedMessages: List<MessageListItem>
-        get() = selected.map { messagesMap[it]!! }
+        get() = selected.map { messageCache.messagesById[it]!! }
 
     val isAllSelected: Boolean
         get() = selected.isNotEmpty() && selected.size == messages.size
@@ -178,7 +189,7 @@ class MessageListAdapter internal constructor(
     private fun getItem(position: Int): MessageListItem = (viewItems[position] as MessageListViewItem.Message).item
 
     fun getItemById(uniqueId: Long): MessageListItem? {
-        return messagesMap[uniqueId]
+        return messageCache.messagesById[uniqueId]
     }
 
     fun getItem(messageReference: MessageReference): MessageListItem? {
@@ -326,7 +337,7 @@ class MessageListAdapter internal constructor(
     }
 
     fun toggleSelection(item: MessageListItem) {
-        if (item.uniqueId !in messagesMap) return
+        if (item.uniqueId !in messageCache.messagesById) return
 
         if (item.uniqueId in selected) {
             deselectMessage(item)
@@ -344,7 +355,7 @@ class MessageListAdapter internal constructor(
     }
 
     fun selectAll() {
-        val uniqueIds = messagesMap.keys.toSet()
+        val uniqueIds = messageCache.messagesById.keys.toSet()
         selected = uniqueIds
     }
 
@@ -356,7 +367,7 @@ class MessageListAdapter internal constructor(
         if (selectedIds.isEmpty()) {
             clearSelected()
         } else {
-            val uniqueIds = messagesMap.keys
+            val uniqueIds = messageCache.messagesById.keys
             selected = selectedIds.intersect(uniqueIds)
         }
     }
